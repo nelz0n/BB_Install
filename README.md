@@ -34,7 +34,7 @@ config/              settings to copy by hand (PowerShell profile, VS Code, Clau
 
 1. Boot from the USB (F9 boot menu on HP). Setup runs on its own: wipes disk 0, installs Pro, creates local account **BB** with an empty password, logs in once and runs `debloat.ps1` (log: `C:\Windows\Temp\bb-debloat.log`).
 2. **Set a password / PIN right away** (Settings → Accounts → Sign-in options).
-3. Windows Update until nothing is left; HP Image Assistant for HP drivers + BIOS.
+3. Windows Update until nothing is left; HP Image Assistant for HP drivers + BIOS. Then rerun `debloat.ps1` (see below) - some apps (new Outlook, Teams, Copilot) arrive after the first login.
 4. `install\apps.ps1`.
 5. Office via ODT (classic Outlook), sign in to OneDrive and Teams.
 6. Turn on BitLocker (Settings → Privacy & security → Device encryption / BitLocker) and back up the recovery key.

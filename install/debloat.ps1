@@ -44,13 +44,14 @@ $appsToRemove = @(
 # Snipping Tool, Notepad, Terminal, Paint.
 
 Write-Host "`n== Removing apps ==" -ForegroundColor Cyan
+$provisioned = Get-AppxProvisionedPackage -Online   # slow call - query once, not per app
 foreach ($app in $appsToRemove) {
     $installed = Get-AppxPackage -AllUsers -Name $app -ErrorAction SilentlyContinue
     if ($installed) {
         $installed | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
         Write-Host "  removed       $app"
     }
-    $prov = Get-AppxProvisionedPackage -Online | Where-Object DisplayName -eq $app
+    $prov = $provisioned | Where-Object DisplayName -eq $app
     if ($prov) {
         $prov | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Out-Null
         Write-Host "  deprovisioned $app"
@@ -69,8 +70,9 @@ function Set-Reg {
 Write-Host "`n== Applying policies ==" -ForegroundColor Cyan
 $P = 'HKLM:\SOFTWARE\Policies\Microsoft'
 
-# Copilot
+# Copilot (legacy built-in Copilot; the new Copilot app is removed above)
 Set-Reg "$P\Windows\WindowsCopilot" 'TurnOffWindowsCopilot' 1
+Set-Reg 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' 'TurnOffWindowsCopilot' 1
 # Recall / AI snapshots
 Set-Reg "$P\Windows\WindowsAI" 'DisableAIDataAnalysis' 1
 Set-Reg "$P\Windows\WindowsAI" 'AllowRecallEnablement' 0
@@ -107,7 +109,7 @@ foreach ($n in 'SilentInstalledAppsEnabled','SystemPaneSuggestionsEnabled','Soft
 }
 $ADV = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
 Set-Reg $ADV 'TaskbarAl' 0              # Start button on the left
-Set-Reg $ADV 'TaskbarDa' 0              # no widgets button
+# No 'TaskbarDa' here: 24H2+ blocks writing it; the Dsh policy above already removes widgets.
 Set-Reg $ADV 'ShowCopilotButton' 0
 Set-Reg $ADV 'HideFileExt' 0            # show file extensions
 Set-Reg $ADV 'LaunchTo' 1               # Explorer opens "This PC"

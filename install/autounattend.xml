@@ -101,6 +101,10 @@
           <Order>2</Order>
           <Path>reg.exe add "HKLM\SYSTEM\Setup\LabConfig" /v BypassSecureBootCheck /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <Path>reg.exe add "HKLM\SYSTEM\Setup\LabConfig" /v BypassRAMCheck /t REG_DWORD /d 1 /f</Path>
+        </RunSynchronousCommand>
       </RunSynchronous>
     </component>
   </settings>
@@ -123,6 +127,11 @@
         <RunSynchronousCommand wcm:action="add">
           <Order>2</Order>
           <Path>reg.exe add "HKLM\SYSTEM\CurrentControlSet\Control\BitLocker" /v PreventDeviceEncryption /t REG_DWORD /d 1 /f</Path>
+        </RunSynchronousCommand>
+        <!-- Local passwords never expire (default is 42 days) -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <Path>net.exe accounts /maxpwage:UNLIMITED</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
     </component>

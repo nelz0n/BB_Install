@@ -15,8 +15,9 @@ $apps = @(
     'Microsoft.VisualStudioCode'
     'Git.Git'
     'GitHub.cli'
-    'Python.Python.3.13'
-    'OpenJS.NodeJS.LTS'
+    'astral-sh.uv'                         # Python via uv (uv python install)
+    'Schniz.fnm'                           # Node versions via fnm
+    'Oven-sh.Bun'
     'Ollama.Ollama'
 
     # --- Power BI ---
@@ -32,14 +33,19 @@ $apps = @(
     'Dropbox.Dropbox'
     'Google.Chrome'
     '7zip.7zip'
+
+    # --- Home ---
+    'Bitwarden.CLI'                        # bw, for Vaultwarden secrets
+    'Tailscale.Tailscale'                  # NAS access
+    'Bambulab.Bambustudio'                 # A1 mini slicer
 )
 
 $failed = @()
 foreach ($id in $apps) {
     Write-Host "`n== $id ==" -ForegroundColor Cyan
     winget install --id $id --exact --silent --accept-package-agreements --accept-source-agreements
-    # 0 = installed, -1978335189 = already installed / no newer version
-    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne -1978335189) { $failed += $id }
+    # 0 = installed, -1978335189 = no newer version, -1978335135 = already installed
+    if ($LASTEXITCODE -notin 0, -1978335189, -1978335135) { $failed += $id }
 }
 
 Write-Host ""
