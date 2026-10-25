@@ -1,0 +1,28 @@
+<!--
+  BB Office config for the Office Deployment Tool (ODT).
+  Microsoft 365 Apps, 64-bit, English, classic Outlook. Teams is installed
+  separately (apps.ps1), so it is left out here.
+
+  Usage (elevated, from the folder where ODT extracted setup.exe):
+    setup.exe /configure <repo>\config\office\office.xml
+
+  Licence: O365ProPlusRetail = Microsoft 365 Apps for enterprise (also E3/E5,
+  Business Premium). For "Apps for business" / Business Standard use
+  O365BusinessRetail instead.
+-->
+<Configuration>
+  <Add OfficeClientEdition="64" Channel="Current">
+    <Product ID="O365ProPlusRetail">
+      <Language ID="en-us" />
+      <ExcludeApp ID="Groove" />
+      <ExcludeApp ID="Lync" />
+      <ExcludeApp ID="Teams" />
+      <ExcludeApp ID="Bing" />
+    </Product>
+  </Add>
+  <Property Name="AUTOACTIVATE" Value="1" />
+  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+  <Updates Enabled="TRUE" Channel="Current" />
+  <RemoveMSI />
+  <Display Level="Full" AcceptEULA="TRUE" />
+</Configuration>

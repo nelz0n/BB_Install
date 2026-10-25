@@ -2,6 +2,7 @@
 <#
   BB_Toolkit - debloat.ps1
   Removes preinstalled apps and turns off Copilot, Recall, widgets, ads and web search.
+  Also applies dev settings (long paths, Developer Mode, ssh-agent).
   Safe to run again at any time - run it after every big Windows feature update
   (anything that brings back apps or settings).
 
@@ -117,5 +118,17 @@ Set-Reg $ADV 'Start_IrisRecommendations' 0
 Set-Reg 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search' 'SearchboxTaskbarMode' 1   # search icon only
 Set-Reg 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo' 'Enabled' 0
 Set-Reg 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy' 'TailoredExperiencesWithDiagnosticDataEnabled' 0
+
+# ----------------------------------------------------------------------------
+# 4. Dev settings - long paths, Developer Mode (symlinks without admin),
+#    ssh-agent running at boot.
+# ----------------------------------------------------------------------------
+Write-Host "`n== Dev settings ==" -ForegroundColor Cyan
+Set-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' 'LongPathsEnabled' 1
+Set-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' 'AllowDevelopmentWithoutDevLicense' 1
+if (Get-Service ssh-agent -ErrorAction SilentlyContinue) {
+    Set-Service ssh-agent -StartupType Automatic
+    Start-Service ssh-agent
+}
 
 Write-Host "`nDone. Sign out and back in (or restart Explorer) to see all changes." -ForegroundColor Green

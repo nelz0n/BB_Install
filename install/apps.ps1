@@ -1,7 +1,8 @@
 <#
   BB_Toolkit - apps.ps1
-  Installs everyday apps with winget and enables Hyper-V. Edit the list, run
-  again any time - apps that are already installed are skipped.
+  Installs everyday apps with winget, Scoop, and enables Hyper-V + Windows
+  Sandbox. Edit the lists, run again any time - anything already installed
+  is skipped.
 
   Usage (normal PowerShell; winget asks for elevation where needed):
     powershell -ExecutionPolicy Bypass -File .\install\apps.ps1
@@ -25,6 +26,7 @@ $apps = @(
 
     # --- AI ---
     'Anthropic.Claude'
+    'Anthropic.ClaudeCode'                 # claude CLI
 
     # --- Work / everyday ---
     'Microsoft.Teams'
@@ -33,8 +35,11 @@ $apps = @(
     'Google.Chrome'
     'alexx2000.DoubleCommander'
     '7zip.7zip'
+    'Microsoft.PowerToys'
+    'Devolutions.UniGetUI'                 # one window to update winget + scoop apps
 
     # --- Home ---
+    'Bitwarden.Bitwarden'                  # desktop app - point it at Vaultwarden
     'Bitwarden.CLI'                        # bw, for Vaultwarden secrets
     'Tailscale.Tailscale'                  # NAS access
     'Bambulab.Bambustudio'                 # A1 mini slicer
@@ -48,17 +53,33 @@ foreach ($id in $apps) {
     if ($LASTEXITCODE -notin 0, -1978335189, -1978335135) { $failed += $id }
 }
 
-# --- Hyper-V (Windows feature, not a winget app; needs a restart) ---
-Write-Host "`n== Hyper-V ==" -ForegroundColor Cyan
-$hv = (Get-CimInstance Win32_OptionalFeature -Filter "Name='Microsoft-Hyper-V'").InstallState
-if ($hv -eq 1) {
-    Write-Host "Already enabled."
+# --- Scoop (must run as normal user, not admin) ---
+Write-Host "`n== Scoop ==" -ForegroundColor Cyan
+if (Get-Command scoop -ErrorAction SilentlyContinue) {
+    Write-Host "Already installed."
 } else {
+    try { Invoke-RestMethod https://get.scoop.sh | Invoke-Expression }
+    catch { $failed += "Scoop ($_)" }
+}
+
+# --- Git: use Windows OpenSSH so keys in ssh-agent work ---
+$git = Join-Path $env:ProgramFiles 'Git\cmd\git.exe'
+if (Test-Path $git) { & $git config --global core.sshCommand 'C:/Windows/System32/OpenSSH/ssh.exe' }
+
+# --- Windows features (not winget apps; need a restart) ---
+$features = @(
+    'Microsoft-Hyper-V-All'                # Hyper-V
+    'Containers-DisposableClientVM'        # Windows Sandbox
+)
+foreach ($f in $features) {
+    Write-Host "`n== $f ==" -ForegroundColor Cyan
+    $state = (Get-CimInstance Win32_OptionalFeature -Filter "Name='$f'").InstallState
+    if ($state -eq 1) { Write-Host "Already enabled."; continue }
     $p = Start-Process dism.exe -Verb RunAs -Wait -PassThru `
-        -ArgumentList '/Online /Enable-Feature /FeatureName:Microsoft-Hyper-V-All /All /NoRestart'
+        -ArgumentList "/Online /Enable-Feature /FeatureName:$f /All /NoRestart"
     # 3010 = enabled, restart required
     if ($p.ExitCode -in 0, 3010) { Write-Host "Enabled - restart to finish." -ForegroundColor Yellow }
-    else { $failed += "Hyper-V (dism exit $($p.ExitCode))" }
+    else { $failed += "$f (dism exit $($p.ExitCode))" }
 }
 
 Write-Host ""
