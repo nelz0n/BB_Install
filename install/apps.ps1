@@ -1,31 +1,49 @@
 <#
   BB_Toolkit - apps.ps1
-  Installs everyday apps with winget, Scoop, and enables Hyper-V. Edit the
-  lists, run again any time - anything already installed is skipped.
+  Installs apps and enables Hyper-V. Edit the lists, run again any time -
+  anything already installed is skipped.
 
-  Usage (normal PowerShell; winget asks for elevation where needed):
+    winget     runtimes, anything other tools link to, GUI apps
+    Scoop      standalone CLI tools only (nothing else depends on them)
+    PSGallery  PowerShell modules used by the profile
+
+  Usage (normal PowerShell, NOT admin - Scoop refuses to run elevated;
+  winget/dism ask for elevation where needed):
     powershell -ExecutionPolicy Bypass -File .\install\apps.ps1
 
-  Find a package id:  winget search <name>
+  Find a package:  winget search <name>  /  scoop search <name>
 #>
 
+$failed = @()
+
+# Scoop shims and the PS profile need local scripts allowed
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction SilentlyContinue
+
+# --- winget ---
 $apps = @(
-    # --- Dev ---
+    # --- Shell / dev runtimes ---
     'Microsoft.PowerShell'
     'Microsoft.VisualStudioCode'
     'Git.Git'
     'GitHub.cli'
+    'gerardog.gsudo'
     'astral-sh.uv'                         # Python via uv (uv python install)
     'Schniz.fnm'                           # Node versions via fnm
     'Oven-sh.Bun'
+    'Microsoft.DotNet.SDK.10'
+    'JohnMacFarlane.Pandoc'
+    'DEVCOM.JetBrainsMonoNerdFont'         # terminal font for starship / Terminal-Icons
     'Ollama.Ollama'
 
-    # --- Power BI ---
+    # --- Power BI / data ---
     'Microsoft.PowerBI'
+    'Databricks.DatabricksCLI'
 
     # --- AI ---
     'Anthropic.Claude'
     'Anthropic.ClaudeCode'                 # claude CLI
+    'OpenAI.Codex'
+    'GitHub.Copilot'                       # Copilot CLI
 
     # --- Work / everyday ---
     'Microsoft.Teams'
@@ -44,7 +62,6 @@ $apps = @(
     'Bambulab.Bambustudio'                 # A1 mini slicer
 )
 
-$failed = @()
 foreach ($id in $apps) {
     Write-Host "`n== $id ==" -ForegroundColor Cyan
     winget install --id $id --exact --silent --accept-package-agreements --accept-source-agreements
@@ -52,14 +69,39 @@ foreach ($id in $apps) {
     if ($LASTEXITCODE -notin 0, -1978335189, -1978335135) { $failed += $id }
 }
 
-# --- Scoop (must run as normal user, not admin) ---
+# --- Scoop: standalone CLI tools ---
+$scoopApps = @(
+    'starship', 'zoxide', 'bat', 'ripgrep', 'fd', 'fzf', 'jq', 'yq', 'delta',
+    'just', 'less', 'jid', 'duckdb'
+    'age'                                  # extras bucket
+    'ghostscript', 'poppler', 'qpdf', 'potrace'   # PDF tools
+)
+
 Write-Host "`n== Scoop ==" -ForegroundColor Cyan
-if (Get-Command scoop -ErrorAction SilentlyContinue) {
-    Write-Host "Already installed."
-} else {
+if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
     try { Invoke-RestMethod https://get.scoop.sh | Invoke-Expression }
     catch { $failed += "Scoop ($_)" }
 }
+if (Get-Command scoop -ErrorAction SilentlyContinue) {
+    if (-not (scoop bucket list | Where-Object Name -eq 'extras')) { scoop bucket add extras }
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { "$env:USERPROFILE\scoop" }
+    foreach ($a in $scoopApps) {
+        if (Test-Path "$scoopRoot\apps\$a") { Write-Host "  $a already installed"; continue }
+        scoop install $a
+        if ($LASTEXITCODE -ne 0) { $failed += "scoop $a" }
+    }
+}
+
+# --- PowerShell modules (installed for pwsh 7, not Windows PowerShell) ---
+$modules = @('Terminal-Icons')
+$pwsh = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
+Write-Host "`n== PowerShell modules ==" -ForegroundColor Cyan
+if (Test-Path $pwsh) {
+    foreach ($m in $modules) {
+        & $pwsh -NoProfile -Command "if (-not (Get-Module -ListAvailable $m)) { Install-PSResource $m -Scope CurrentUser -TrustRepository }"
+        if ($LASTEXITCODE -ne 0) { $failed += "module $m" }
+    }
+} else { $failed += 'PowerShell modules (pwsh 7 not found)' }
 
 # --- Git: use Windows OpenSSH so keys in ssh-agent work ---
 $git = Join-Path $env:ProgramFiles 'Git\cmd\git.exe'
@@ -82,7 +124,7 @@ foreach ($f in $features) {
 
 Write-Host ""
 if ($failed) {
-    Write-Host "Failed (try manually with 'winget search'):" -ForegroundColor Yellow
+    Write-Host "Failed (try manually with 'winget search' / 'scoop search'):" -ForegroundColor Yellow
     $failed | ForEach-Object { Write-Host "  $_" }
 } else {
     Write-Host "All apps installed." -ForegroundColor Green

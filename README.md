@@ -4,7 +4,7 @@ Clean Windows 11 Pro install and setup for my notebook. Plain scripts, no dotfil
 install/
   autounattend.xml   hands-off Windows install (EN UI, SK keyboard, local account BB)
   debloat.ps1        removes junk apps, turns off Copilot/Recall/widgets/ads, dev settings - rerun after big updates
-  apps.ps1           installs apps (winget + Scoop), enables Hyper-V - rerun any time
+  apps.ps1           installs apps (winget, Scoop for standalone CLI tools, PS modules), enables Hyper-V - rerun any time
   devdrive.ps1       optional: creates a Dev Drive for projects
 config/              settings to copy by hand (PowerShell profile, Office)
 ```
@@ -46,7 +46,7 @@ config/              settings to copy by hand (PowerShell profile, Office)
    ssh-add $HOME\.ssh\id_ed25519
    gh ssh-key add $HOME\.ssh\id_ed25519.pub
    ```
-9. Copy settings from `config/` (PowerShell profile → `$PROFILE`).
+9. Copy settings from `config/` (PowerShell profile → `$PROFILE`). Set the terminal font to **JetBrainsMono Nerd Font** (Windows Terminal → Settings → Defaults → Appearance) so starship and Terminal-Icons show icons.
 10. Optional: `install\devdrive.ps1` (admin) for a Dev Drive, then keep projects on it.
 
 ## After a big Windows update
