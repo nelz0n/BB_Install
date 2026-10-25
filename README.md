@@ -4,7 +4,7 @@ Clean Windows 11 Pro install and setup for my notebook. Plain scripts, no dotfil
 install/
   autounattend.xml   hands-off Windows install (EN UI, SK keyboard, local account BB)
   debloat.ps1        removes junk apps, turns off Copilot/Recall/widgets/ads, dev settings - rerun after big updates
-  apps.ps1           installs apps (winget + Scoop), enables Hyper-V + Windows Sandbox - rerun any time
+  apps.ps1           installs apps (winget + Scoop), enables Hyper-V - rerun any time
   devdrive.ps1       optional: creates a Dev Drive for projects
 config/              settings to copy by hand (PowerShell profile, Office)
 ```
@@ -36,7 +36,7 @@ config/              settings to copy by hand (PowerShell profile, Office)
 1. Boot from the USB (F9 boot menu on HP). Setup runs on its own: wipes disk 0, installs Pro, creates local account **BB** with an empty password, logs in once and runs `debloat.ps1` (log: `C:\Windows\Temp\bb-debloat.log`).
 2. **Set a password / PIN right away** (Settings → Accounts → Sign-in options).
 3. Windows Update until nothing is left; HP Image Assistant for HP drivers + BIOS. Then rerun `debloat.ps1` (see below) - some apps (new Outlook, Teams, Copilot) arrive after the first login.
-4. `install\apps.ps1` in a **normal** (not admin) PowerShell - Scoop refuses to install as admin. Restart afterwards (Hyper-V, Sandbox).
+4. `install\apps.ps1` in a **normal** (not admin) PowerShell - Scoop refuses to install as admin. Restart afterwards (Hyper-V).
 5. Python and Node through their managers: `uv python install`, `fnm install --lts`.
 6. Office: get `setup.exe` from the Office Deployment Tool (microsoft.com), then `setup.exe /configure config\office\office.xml`. Sign in to OneDrive and Teams.
 7. Turn on BitLocker (Settings → Privacy & security → Device encryption / BitLocker) and save the recovery key **in Vaultwarden**.

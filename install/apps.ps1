@@ -1,8 +1,7 @@
 <#
   BB_Toolkit - apps.ps1
-  Installs everyday apps with winget, Scoop, and enables Hyper-V + Windows
-  Sandbox. Edit the lists, run again any time - anything already installed
-  is skipped.
+  Installs everyday apps with winget, Scoop, and enables Hyper-V. Edit the
+  lists, run again any time - anything already installed is skipped.
 
   Usage (normal PowerShell; winget asks for elevation where needed):
     powershell -ExecutionPolicy Bypass -File .\install\apps.ps1
@@ -69,7 +68,6 @@ if (Test-Path $git) { & $git config --global core.sshCommand 'C:/Windows/System3
 # --- Windows features (not winget apps; need a restart) ---
 $features = @(
     'Microsoft-Hyper-V-All'                # Hyper-V
-    'Containers-DisposableClientVM'        # Windows Sandbox
 )
 foreach ($f in $features) {
     Write-Host "`n== $f ==" -ForegroundColor Cyan
