@@ -68,10 +68,9 @@ foreach ($id in $apps) {
 
 # --- Scoop: standalone CLI tools ---
 $scoopApps = @(
-    'starship', 'zoxide', 'bat', 'ripgrep', 'fd', 'fzf', 'jq', 'yq', 'delta',
-    'just', 'less', 'jid', 'duckdb'
-    'age'                                  # extras bucket
-    'ghostscript', 'poppler', 'qpdf', 'potrace'   # PDF tools
+    'starship', 'zoxide', 'bat', 'ripgrep', 'fd', 'fzf', 'less', 'delta',
+    'jq', 'just', 'duckdb'
+    'ghostscript', 'poppler', 'qpdf'       # PDF tools (used by Claude document skills)
 )
 
 Write-Host "`n== Scoop ==" -ForegroundColor Cyan
@@ -80,7 +79,6 @@ if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
     catch { $failed += "Scoop ($_)" }
 }
 if (Get-Command scoop -ErrorAction SilentlyContinue) {
-    if (-not (scoop bucket list | Where-Object Name -eq 'extras')) { scoop bucket add extras }
     $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { "$env:USERPROFILE\scoop" }
     foreach ($a in $scoopApps) {
         if (Test-Path "$scoopRoot\apps\$a") { Write-Host "  $a already installed"; continue }
