@@ -35,15 +35,12 @@ $apps = @(
     'DEVCOM.JetBrainsMonoNerdFont'         # terminal font for starship / Terminal-Icons
     'Ollama.Ollama'
 
-    # --- Power BI / data ---
+    # --- Power BI ---
     'Microsoft.PowerBI'
-    'Databricks.DatabricksCLI'
 
     # --- AI ---
     'Anthropic.Claude'
     'Anthropic.ClaudeCode'                 # claude CLI
-    'OpenAI.Codex'
-    'GitHub.Copilot'                       # Copilot CLI
 
     # --- Work / everyday ---
     'Microsoft.Teams'
