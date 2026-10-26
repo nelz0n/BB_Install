@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   BB_Toolkit - autounattend.xml
-  Windows 11 Pro 26H2 x64, English UI, Slovak + US keyboard, Prague time zone,
+  Windows 11 Pro 26H2 x64, English UI, US + Slovak (QWERTY) keyboard, Prague time zone,
   local account "BB", no Microsoft account, automatic install to DISK 0.
+  Region is set up as Czech Republic (EEA); firstlogon.ps1 then switches the formats
+  to English (World).
 
   !!! WARNING !!!
   This file WIPES DISK 0 COMPLETELY without asking. Before you boot the USB,
@@ -20,15 +22,19 @@
       <SetupUILanguage>
         <UILanguage>en-US</UILanguage>
       </SetupUILanguage>
-      <InputLocale>041b:0000041b;0409:00000409</InputLocale>
+      <InputLocale>0409:00000409;041b:0001041b</InputLocale>
       <SystemLocale>en-US</SystemLocale>
       <UILanguage>en-US</UILanguage>
-      <UserLocale>sk-SK</UserLocale>
+      <UserLocale>en-US</UserLocale>
     </component>
 
     <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-      <!-- Disk 0: GPT, EFI 300 MB, MSR 16 MB, Windows = rest of the disk -->
+      <!-- Disk 0: GPT, EFI 300 MB, MSR 16 MB, Windows = rest of the disk.
+           No recovery partition here on purpose: on NTFS, Windows shrinks C: on first
+           boot and creates the WinRE partition right after it (Microsoft's recommended
+           layout). Check with `reagentc /info` before turning on BitLocker. -->
       <DiskConfiguration>
+        <WillShowUI>OnError</WillShowUI>
         <Disk wcm:action="add">
           <DiskID>0</DiskID>
           <WillWipeDisk>true</WillWipeDisk>
@@ -118,7 +124,8 @@
 
     <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <RunSynchronous>
-        <!-- Allow setup without internet / Microsoft account -->
+        <!-- Fallback only: setup stays offline (no Wi-Fi page) and creates the local account
+             below, so no Microsoft account screen. Harmless if a future build ignores it. -->
         <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
           <Path>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE" /v BypassNRO /t REG_DWORD /d 1 /f</Path>
@@ -133,6 +140,13 @@
           <Order>3</Order>
           <Path>net.exe accounts /maxpwage:UNLIMITED</Path>
         </RunSynchronousCommand>
+        <!-- Remove the junk apps from the image before the BB profile exists, so they are
+             never installed (debloat.ps1 -SystemOnly from this repo on the USB).
+             Kept terse on purpose: Path is limited to 259 characters. -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s=Get-PSDrive -PSProvider FileSystem|%{$_.Root+'install\debloat.ps1'}|?{Test-Path $_}|select -f 1;$l='C:\Windows\Temp\bb-debloat-system.log';if($s){&amp;$s -SystemOnly *&gt;$l}else{'not found'&gt;$l}"</Path>
+        </RunSynchronousCommand>
       </RunSynchronous>
     </component>
   </settings>
@@ -140,10 +154,12 @@
   <!-- ===================== oobeSystem: first boot ===================== -->
   <settings pass="oobeSystem">
     <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-      <InputLocale>041b:0000041b;0409:00000409</InputLocale>
+      <InputLocale>0409:00000409;041b:0001041b</InputLocale>
       <SystemLocale>en-US</SystemLocale>
       <UILanguage>en-US</UILanguage>
-      <UserLocale>sk-SK</UserLocale>
+      <!-- cs-CZ = region Czech Republic, which fixes the EEA device region at setup.
+           en-001 here would make the region "World" (not EEA). -->
+      <UserLocale>cs-CZ</UserLocale>
     </component>
 
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
@@ -152,7 +168,6 @@
         <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
         <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
         <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-        <HideLocalAccountScreen>true</HideLocalAccountScreen>
         <ProtectYourPC>3</ProtectYourPC>
       </OOBE>
 
@@ -172,6 +187,8 @@
         </LocalAccounts>
       </UserAccounts>
 
+      <!-- One auto-logon. Windows adds 1 to LogonCount (known issue), so firstlogon.ps1 and
+           command 1 below reset it to 0 - Microsoft's documented workaround. -->
       <AutoLogon>
         <Enabled>true</Enabled>
         <LogonCount>1</LogonCount>
@@ -182,12 +199,19 @@
         </Password>
       </AutoLogon>
 
+      <!-- These now all start at the same time (no waiting on Order), so each one must
+           stand on its own; the real work is chained inside firstlogon.ps1. -->
       <FirstLogonCommands>
-        <!-- Find this repo on the install USB and run install\debloat.ps1 from it -->
         <SynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <Description>BB_Toolkit debloat</Description>
-          <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s = Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'install\debloat.ps1' } | Where-Object { Test-Path $_ } | Select-Object -First 1; if ($s) { &amp; $s *&gt; C:\Windows\Temp\bb-debloat.log } else { 'debloat.ps1 not found on any drive' | Out-File C:\Windows\Temp\bb-debloat.log }"</CommandLine>
+          <Description>Stop further auto-logons</Description>
+          <CommandLine>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /t REG_DWORD /d 0 /f</CommandLine>
+        </SynchronousCommand>
+        <!-- Find this repo on the install USB and run install\firstlogon.ps1 from it -->
+        <SynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <Description>BB_Toolkit first logon</Description>
+          <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s = Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'install\firstlogon.ps1' } | Where-Object { Test-Path $_ } | Select-Object -First 1; if ($s) { &amp; $s *&gt; C:\Windows\Temp\bb-firstlogon.log } else { 'firstlogon.ps1 not found on any drive' | Out-File C:\Windows\Temp\bb-firstlogon.log }"</CommandLine>
         </SynchronousCommand>
       </FirstLogonCommands>
     </component>

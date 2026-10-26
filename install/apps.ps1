@@ -59,12 +59,30 @@ $apps = @(
     'Bambulab.Bambustudio'                 # A1 mini slicer
 )
 
+# Extra winget arguments per package
+$extraArgs = @{
+    # MSI into Program Files\PowerShell\7 - winget now picks the MSIX build by default
+    'Microsoft.PowerShell' = '--installer-type', 'wix'
+}
+
+# On a fresh install winget only appears once the Store has registered App Installer
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe
+}
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    throw 'winget not found - update "App Installer" in Microsoft Store, then run again.'
+}
+
 foreach ($id in $apps) {
     Write-Host "`n== $id ==" -ForegroundColor Cyan
-    winget install --id $id --exact --silent --accept-package-agreements --accept-source-agreements
+    winget install --id $id --exact --silent --accept-package-agreements --accept-source-agreements $extraArgs[$id]
     # 0 = installed, -1978335189 = no newer version, -1978335135 = already installed
     if ($LASTEXITCODE -notin 0, -1978335189, -1978335135) { $failed += $id }
 }
+
+# Pick up PATH changes from the installers above (git for Scoop buckets, etc.)
+$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+            [Environment]::GetEnvironmentVariable('Path', 'User')
 
 # --- Scoop: standalone CLI tools ---
 $scoopApps = @(

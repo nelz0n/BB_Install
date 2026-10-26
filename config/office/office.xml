@@ -17,7 +17,8 @@
       <ExcludeApp ID="Groove" />
       <ExcludeApp ID="Lync" />
       <ExcludeApp ID="Teams" />
-      <ExcludeApp ID="Bing" />
+      <!-- new Outlook; Microsoft 365 Apps 2502+ installs it next to classic by default -->
+      <ExcludeApp ID="OutlookForWindows" />
     </Product>
   </Add>
   <Property Name="AUTOACTIVATE" Value="1" />

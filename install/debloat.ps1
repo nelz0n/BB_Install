@@ -8,7 +8,12 @@
 
   Usage (elevated PowerShell):
     powershell -ExecutionPolicy Bypass -File .\install\debloat.ps1
+
+  -SystemOnly: machine-wide part only (deprovision apps, HKLM policies). autounattend.xml
+  runs it in the specialize pass, before any user profile exists, so the apps are never
+  installed for BB. The full run at first logon then does the per-user part.
 #>
+param([switch]$SystemOnly)
 
 $ErrorActionPreference = 'Continue'
 
@@ -22,15 +27,17 @@ $appsToRemove = @(
     'Microsoft.BingWeather'
     'Microsoft.BingSearch'
     'Microsoft.Copilot'
-    'Microsoft.GetHelp'
+    'Microsoft.Windows.Ai.Copilot.Provider' # "Ask Copilot" in search
     'Microsoft.Getstarted'                 # Tips
-    'Microsoft.MicrosoftOfficeHub'         # "Microsoft 365" ad app (real Office is installed separately)
+    'Microsoft.MicrosoftOfficeHub'         # "Microsoft 365 Copilot" app (real Office is installed separately)
+    'Microsoft.MicrosoftJournal'
     'Microsoft.MicrosoftSolitaireCollection'
     'Microsoft.MicrosoftStickyNotes'
     'Microsoft.OutlookForWindows'          # "new Outlook" - you use classic desktop Outlook
-    'Microsoft.People'
+    'microsoft.windowscommunicationsapps'  # old Mail and Calendar
     'Microsoft.PowerAutomateDesktop'
     'Microsoft.Todos'
+    'Microsoft.Windows.DevHome'            # discontinued
     'Microsoft.WindowsFeedbackHub'
     'Microsoft.WindowsMaps'
     'Microsoft.WindowsSoundRecorder'
@@ -38,25 +45,35 @@ $appsToRemove = @(
     'Microsoft.YourPhone'                  # Phone Link
     'MicrosoftCorporationII.QuickAssist'
     'MicrosoftWindows.CrossDevice'
-    'Microsoft.549981C3F5F10'              # Cortana leftovers
-    'MicrosoftTeams'                       # old consumer Teams (personal)
     # NOT 'MSTeams' - that is the new work Teams installed by apps.ps1
 )
 # Deliberately KEPT: Store, Xbox apps (games/Game Pass), Calculator, Photos,
-# Snipping Tool, Notepad, Terminal, Paint.
+# Snipping Tool, Notepad, Terminal, Paint, Get Help (troubleshooters open in it).
 
 Write-Host "`n== Removing apps ==" -ForegroundColor Cyan
 $provisioned = Get-AppxProvisionedPackage -Online   # slow call - query once, not per app
 foreach ($app in $appsToRemove) {
-    $installed = Get-AppxPackage -AllUsers -Name $app -ErrorAction SilentlyContinue
-    if ($installed) {
-        $installed | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-        Write-Host "  removed       $app"
+    if (-not $SystemOnly) {
+        $installed = Get-AppxPackage -AllUsers -Name $app -ErrorAction SilentlyContinue
+        if ($installed) {
+            $installed | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+            Write-Host "  removed       $app"
+        }
     }
     $prov = $provisioned | Where-Object DisplayName -eq $app
     if ($prov) {
-        $prov | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Out-Null
+        $prov | Remove-AppxProvisionedPackage -Online -AllUsers -ErrorAction SilentlyContinue | Out-Null
         Write-Host "  deprovisioned $app"
+    }
+}
+
+# Setup schedules some apps to be installed after OOBE (new Outlook, Dev Home,
+# Mobile devices) - drop those jobs so they do not come back.
+$oobeJobs = 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe'
+foreach ($job in 'OutlookUpdate', 'DevHomeUpdate', 'CrossDeviceUpdate') {
+    if (Test-Path "$oobeJobs\$job") {
+        Remove-Item "$oobeJobs\$job" -Recurse -Force
+        Write-Host "  dropped install job $job"
     }
 }
 
@@ -72,18 +89,22 @@ function Set-Reg {
 Write-Host "`n== Applying policies ==" -ForegroundColor Cyan
 $P = 'HKLM:\SOFTWARE\Policies\Microsoft'
 
-# Copilot (legacy built-in Copilot; the new Copilot app is removed above)
-Set-Reg "$P\Windows\WindowsCopilot" 'TurnOffWindowsCopilot' 1
-Set-Reg 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' 'TurnOffWindowsCopilot' 1
-# Recall / AI snapshots
+# Copilot app: removed above; this also uninstalls it if it comes back unused
+Set-Reg "$P\Windows\WindowsAI" 'RemoveMicrosoftCopilotApp' 1
+# Recall / AI snapshots, Click to Do
 Set-Reg "$P\Windows\WindowsAI" 'DisableAIDataAnalysis' 1
 Set-Reg "$P\Windows\WindowsAI" 'AllowRecallEnablement' 0
-# Widgets
+Set-Reg "$P\Windows\WindowsAI" 'DisableClickToDo' 1
+# AI in Notepad and Paint
+Set-Reg 'HKLM:\SOFTWARE\Policies\WindowsNotepad' 'DisableAIFeatures' 1
+$paint = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint'
+foreach ($n in 'DisableCocreator', 'DisableGenerativeFill', 'DisableImageCreator') { Set-Reg $paint $n 1 }
+# Widgets (taskbar and lock screen)
 Set-Reg "$P\Dsh" 'AllowNewsAndInterests' 0
-# Web/Bing results in Start search
-Set-Reg "$P\Windows\Windows Search" 'DisableWebSearch' 1
-Set-Reg "$P\Windows\Windows Search" 'ConnectedSearchUseWeb' 0
-Set-Reg 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'DisableSearchBoxSuggestions' 1
+Set-Reg "$P\Dsh" 'DisableWidgetsOnLockScreen' 1
+# Search highlights (the old DisableWebSearch / ConnectedSearchUseWeb policies no
+# longer do anything; web results are turned off per user below)
+Set-Reg "$P\Windows\Windows Search" 'EnableDynamicContentInWSB' 0
 # Promoted apps / suggestions (honoured fully only on Enterprise/Education, harmless on Pro)
 Set-Reg "$P\Windows\CloudContent" 'DisableWindowsConsumerFeatures' 1
 Set-Reg "$P\Windows\CloudContent" 'DisableConsumerAccountStateContent' 1
@@ -98,35 +119,47 @@ Set-Reg "$P\Edge" 'HideFirstRunExperience' 1
 Set-Reg "$P\Edge" 'HubsSidebarEnabled' 0
 Set-Reg "$P\Edge" 'EdgeShoppingAssistantEnabled' 0
 
+# Dev settings (machine-wide): long paths, Developer Mode (symlinks without admin)
+Set-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' 'LongPathsEnabled' 1
+Set-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' 'AllowDevelopmentWithoutDevLicense' 1
+
+if ($SystemOnly) { Write-Host "`nDone (system part)." -ForegroundColor Green; return }
+
 # ----------------------------------------------------------------------------
 # 3. Per-user settings (current user) - ads, tips, Start/taskbar.
 # ----------------------------------------------------------------------------
 Write-Host "`n== User settings ==" -ForegroundColor Cyan
+Set-Reg 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' 'TurnOffWindowsCopilot' 1   # legacy, harmless
+Set-Reg 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'DisableSearchBoxSuggestions' 1   # no web results in Start search
 $CDM = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
 foreach ($n in 'SilentInstalledAppsEnabled','SystemPaneSuggestionsEnabled','SoftLandingEnabled',
                'SubscribedContent-338388Enabled','SubscribedContent-338389Enabled',
                'SubscribedContent-353694Enabled','SubscribedContent-353696Enabled',
-               'SubscribedContent-310093Enabled','PreInstalledAppsEnabled','OemPreInstalledAppsEnabled') {
+               'SubscribedContent-310093Enabled','PreInstalledAppsEnabled','OemPreInstalledAppsEnabled',
+               'SubscribedContent-338393Enabled','SubscribedContent-353698Enabled',   # suggestions in Settings
+               'SubscribedContent-338387Enabled','RotatingLockScreenOverlayEnabled') { # lock screen "fun facts"
     Set-Reg $CDM $n 0
 }
 $ADV = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
 Set-Reg $ADV 'TaskbarAl' 0              # Start button on the left
 # No 'TaskbarDa' here: 24H2+ blocks writing it; the Dsh policy above already removes widgets.
-Set-Reg $ADV 'ShowCopilotButton' 0
 Set-Reg $ADV 'HideFileExt' 0            # show file extensions
 Set-Reg $ADV 'LaunchTo' 1               # Explorer opens "This PC"
 Set-Reg $ADV 'Start_IrisRecommendations' 0
-Set-Reg 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search' 'SearchboxTaskbarMode' 1   # search icon only
-Set-Reg 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo' 'Enabled' 0
-Set-Reg 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy' 'TailoredExperiencesWithDiagnosticDataEnabled' 0
+Set-Reg $ADV 'Start_AccountNotifications' 0      # Microsoft account nags in Start
+Set-Reg $ADV 'ShowSyncProviderNotifications' 0   # ads in Explorer
+$CV = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion'
+Set-Reg "$CV\Search" 'SearchboxTaskbarMode' 1   # search icon only
+Set-Reg "$CV\AdvertisingInfo" 'Enabled' 0
+Set-Reg "$CV\Privacy" 'TailoredExperiencesWithDiagnosticDataEnabled' 0
+Set-Reg "$CV\SystemSettings\AccountNotifications" 'EnableAccountNotifications' 0
+Set-Reg "$CV\UserProfileEngagement" 'ScoobeSystemSettingEnabled' 0               # "finish setting up your device"
+Set-Reg "$CV\Notifications\Settings\Windows.SystemToast.Suggested" 'Enabled' 0   # suggestion toasts
 
 # ----------------------------------------------------------------------------
-# 4. Dev settings - long paths, Developer Mode (symlinks without admin),
-#    ssh-agent running at boot.
+# 4. ssh-agent running at boot.
 # ----------------------------------------------------------------------------
 Write-Host "`n== Dev settings ==" -ForegroundColor Cyan
-Set-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' 'LongPathsEnabled' 1
-Set-Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' 'AllowDevelopmentWithoutDevLicense' 1
 if (Get-Service ssh-agent -ErrorAction SilentlyContinue) {
     Set-Service ssh-agent -StartupType Automatic
     Start-Service ssh-agent
