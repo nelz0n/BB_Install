@@ -51,6 +51,7 @@ $apps = @(
     '7zip.7zip'
     'Microsoft.PowerToys'
     'Devolutions.UniGetUI'                 # one window to update winget + scoop apps
+    'HP.ImageAssistant'                    # HP drivers/BIOS/firmware -> C:\SWSetup\HPImageAssistant
 
     # --- Home ---
     'Bitwarden.Bitwarden'                  # desktop app - point it at Vaultwarden

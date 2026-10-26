@@ -46,8 +46,13 @@ config/              settings to copy by hand (PowerShell profile, Office)
    - `C:\Windows\Temp\bb-firstlogon.log` shows `DeviceRegion = 75`. That is the EEA region (Edge uninstallable, DMA choices) and only a reset can change it.
    - Activation: Settings → System → Activation says active (HP firmware Pro key). If not, in an admin shell: `slmgr /ipk <key>` with the key from `(Get-CimInstance SoftwareLicensingService).OA3xOriginalProductKey`.
 3. **Set a password / PIN right away** (Settings → Accounts → Sign-in options). Then connect Wi-Fi.
-4. Windows Update until nothing is left; HP Image Assistant for HP drivers + BIOS. Then rerun `debloat.ps1` (see below) - some apps can arrive with updates.
+4. Windows Update until nothing is left, including Advanced options → Optional updates (HP drivers and firmware come this way too). Then rerun `debloat.ps1` (see below) - some apps can arrive with updates.
 5. `install\apps.ps1` in a **normal** (not admin) PowerShell - Scoop refuses to install as admin. Restart afterwards (Hyper-V).
+   Then HP drivers, BIOS and firmware with **HP Image Assistant** (installed by `apps.ps1`; no HP Support Assistant needed). On AC power, in an admin shell:
+   ```powershell
+   C:\SWSetup\HPImageAssistant\HPImageAssistant.exe /Operation:Analyze /Action:Install /Selection:All /Category:Drivers,BIOS,Firmware /Silent /ReportFolder:C:\Temp\HPIA
+   ```
+   Restart afterwards. Rerun every 2-3 months (`winget upgrade HP.ImageAssistant` first).
 6. Python and Node through their managers: `uv python install`, `fnm install --lts`.
 7. Office: get `setup.exe` from the Office Deployment Tool (microsoft.com), then `setup.exe /configure config\office\office.xml`. Sign in to OneDrive and Teams.
 8. BitLocker. First check WinRE in an admin shell: `reagentc /info` must say **Enabled**, with a location on `partition4` (the recovery partition Windows creates after C: on first boot). Then Control Panel → BitLocker Drive Encryption → Turn on, and save the recovery key **in Vaultwarden**.
