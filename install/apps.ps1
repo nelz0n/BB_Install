@@ -33,7 +33,6 @@ $apps = @(
     'Microsoft.DotNet.SDK.10'
     'JohnMacFarlane.Pandoc'
     'DEVCOM.JetBrainsMonoNerdFont'         # terminal font for starship / Terminal-Icons
-    'Ollama.Ollama'
 
     # --- Power BI ---
     'Microsoft.PowerBI'
@@ -58,6 +57,9 @@ $apps = @(
     'Bitwarden.CLI'                        # bw, for Vaultwarden secrets
     'Tailscale.Tailscale'                  # NAS access
     'Bambulab.Bambustudio'                 # A1 mini slicer
+    'OpenSCAD.OpenSCAD'                    # parametric 3D models
+    'Loxone.LoxoneConfig'                  # Miniserver config
+    'Valve.Steam'
 )
 
 # Extra winget arguments per package
