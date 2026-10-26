@@ -29,6 +29,19 @@ Copy-UserInternationalSettingsToSystem -WelcomeScreen $true -NewUser $true
 $region = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Control Panel\DeviceRegion' -ErrorAction SilentlyContinue).DeviceRegion
 Write-Host "  DeviceRegion = $region"
 
+# B: backup partition survives the reinstall but gets the next free letter - give B back.
+# It is the only other data partition on the Windows disk (works even while BitLocker-locked).
+Write-Host "`n== Backup drive ==" -ForegroundColor Cyan
+$sysDisk = (Get-Partition -DriveLetter C).DiskNumber
+$data = @(Get-Partition -DiskNumber $sysDisk |
+    Where-Object { $_.GptType -eq '{ebd0a0a2-b9e5-4433-87c0-68b6b72699c7}' -and $_.DriveLetter -ne 'C' })
+if ($data.Count -eq 1) {
+    if ($data[0].DriveLetter -ne 'B') { $data[0] | Set-Partition -NewDriveLetter B }
+    Write-Host "  backup partition $($data[0].PartitionNumber) is B:"
+} else {
+    Write-Host "  expected 1 backup partition on disk $sysDisk, found $($data.Count) - set the letter by hand"
+}
+
 & (Join-Path $PSScriptRoot 'debloat.ps1')
 
 # Reload the taskbar/Explorer settings written by debloat.ps1

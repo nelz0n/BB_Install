@@ -2,14 +2,13 @@
 <!--
   BB_Toolkit - autounattend.xml
   Windows 11 Pro 26H2 x64, English UI, US + Slovak (QWERTY) keyboard, Prague time zone,
-  local account "BB", no Microsoft account, automatic install to DISK 0.
+  local account "BB", no Microsoft account.
   Region is set up as Czech Republic (EEA); firstlogon.ps1 then switches the formats
   to English (World).
 
-  !!! WARNING !!!
-  This file WIPES DISK 0 COMPLETELY without asking. Before you boot the USB,
-  make sure disk 0 is the system drive and NOT the drive with VMs/games/projects.
-  See README.md -> "Check disk 0 first".
+  Hands-off except ONE stop: setup asks where to install. Nothing on the disk is touched
+  automatically - you delete the old Windows partition yourself and pick the space.
+  See README.md -> "Install".
 
   Usage: copy the whole repository (this file must end up in the USB root as
   \autounattend.xml, the rest of the repo next to it) onto the Windows install USB.
@@ -29,64 +28,9 @@
     </component>
 
     <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-      <!-- Disk 0: GPT, EFI 300 MB, MSR 16 MB, Windows = rest of the disk.
-           No recovery partition here on purpose: on NTFS, Windows shrinks C: on first
-           boot and creates the WinRE partition right after it (Microsoft's recommended
-           layout). Check with `reagentc /info` before turning on BitLocker. -->
-      <DiskConfiguration>
-        <WillShowUI>OnError</WillShowUI>
-        <Disk wcm:action="add">
-          <DiskID>0</DiskID>
-          <WillWipeDisk>true</WillWipeDisk>
-          <CreatePartitions>
-            <CreatePartition wcm:action="add">
-              <Order>1</Order>
-              <Type>EFI</Type>
-              <Size>300</Size>
-            </CreatePartition>
-            <CreatePartition wcm:action="add">
-              <Order>2</Order>
-              <Type>MSR</Type>
-              <Size>16</Size>
-            </CreatePartition>
-            <CreatePartition wcm:action="add">
-              <Order>3</Order>
-              <Type>Primary</Type>
-              <Extend>true</Extend>
-            </CreatePartition>
-          </CreatePartitions>
-          <ModifyPartitions>
-            <ModifyPartition wcm:action="add">
-              <Order>1</Order>
-              <PartitionID>1</PartitionID>
-              <Format>FAT32</Format>
-              <Label>System</Label>
-            </ModifyPartition>
-            <ModifyPartition wcm:action="add">
-              <Order>2</Order>
-              <PartitionID>2</PartitionID>
-            </ModifyPartition>
-            <ModifyPartition wcm:action="add">
-              <Order>3</Order>
-              <PartitionID>3</PartitionID>
-              <Format>NTFS</Format>
-              <Label>Windows</Label>
-              <Letter>C</Letter>
-            </ModifyPartition>
-          </ModifyPartitions>
-        </Disk>
-      </DiskConfiguration>
-
-      <ImageInstall>
-        <OSImage>
-          <InstallTo>
-            <DiskID>0</DiskID>
-            <PartitionID>3</PartitionID>
-          </InstallTo>
-          <InstallToAvailablePartition>false</InstallToAvailablePartition>
-        </OSImage>
-      </ImageInstall>
-
+      <!-- No DiskConfiguration / ImageInstall on purpose: setup stops at the disk page and
+           you choose where Windows goes, so the B: backup partition can never be hit by
+           a hard-coded disk or partition number. -->
       <UserData>
         <!-- Microsoft's public generic setup key for Windows 11 Pro. It only selects the
              edition; the real license is read from the HP firmware and activates on its own. -->
@@ -141,11 +85,12 @@
           <Path>net.exe accounts /maxpwage:UNLIMITED</Path>
         </RunSynchronousCommand>
         <!-- Remove the junk apps from the image before the BB profile exists, so they are
-             never installed (debloat.ps1 -SystemOnly from this repo on the USB).
+             never installed (debloat.ps1 -SystemOnly from this repo on the USB - the drive
+             with sources\boot.wim, so a copy on B: is never picked up).
              Kept terse on purpose: Path is limited to 259 characters. -->
         <RunSynchronousCommand wcm:action="add">
           <Order>4</Order>
-          <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s=Get-PSDrive -PSProvider FileSystem|%{$_.Root+'install\debloat.ps1'}|?{Test-Path $_}|select -f 1;$l='C:\Windows\Temp\bb-debloat-system.log';if($s){&amp;$s -SystemOnly *&gt;$l}else{'not found'&gt;$l}"</Path>
+          <Path>powershell.exe -NoP -EP Bypass -C "$r=(Get-PSDrive -PSProvider FileSystem).Root|?{Test-Path($_+'sources\boot.wim')}|select -f 1;$s=$r+'install\debloat.ps1';$l='C:\Windows\Temp\bb-debloat-system.log';if($r){&amp;$s -SystemOnly *&gt;$l}else{'USB not found'&gt;$l}"</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
     </component>
@@ -207,11 +152,11 @@
           <Description>Stop further auto-logons</Description>
           <CommandLine>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /t REG_DWORD /d 0 /f</CommandLine>
         </SynchronousCommand>
-        <!-- Find this repo on the install USB and run install\firstlogon.ps1 from it -->
+        <!-- Find the install USB (the drive with sources\boot.wim) and run install\firstlogon.ps1 from it -->
         <SynchronousCommand wcm:action="add">
           <Order>2</Order>
           <Description>BB_Toolkit first logon</Description>
-          <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s = Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root 'install\firstlogon.ps1' } | Where-Object { Test-Path $_ } | Select-Object -First 1; if ($s) { &amp; $s *&gt; C:\Windows\Temp\bb-firstlogon.log } else { 'firstlogon.ps1 not found on any drive' | Out-File C:\Windows\Temp\bb-firstlogon.log }"</CommandLine>
+          <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$r = (Get-PSDrive -PSProvider FileSystem).Root | Where-Object { Test-Path ($_ + 'sources\boot.wim') } | Select-Object -First 1; $l = 'C:\Windows\Temp\bb-firstlogon.log'; if ($r) { &amp; ($r + 'install\firstlogon.ps1') *&gt; $l } else { 'install USB not found' | Out-File $l }"</CommandLine>
         </SynchronousCommand>
       </FirstLogonCommands>
     </component>
