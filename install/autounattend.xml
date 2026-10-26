@@ -29,8 +29,8 @@
 
     <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <!-- No DiskConfiguration / ImageInstall on purpose: setup stops at the disk page and
-           you choose where Windows goes, so the B: backup partition can never be hit by
-           a hard-coded disk or partition number. -->
+           you choose where Windows goes, so nothing is ever wiped by a hard-coded disk
+           or partition number. -->
       <UserData>
         <!-- Microsoft's public generic setup key for Windows 11 Pro. It only selects the
              edition; the real license is read from the HP firmware and activates on its own. -->
@@ -86,7 +86,7 @@
         </RunSynchronousCommand>
         <!-- Remove the junk apps from the image before the BB profile exists, so they are
              never installed (debloat.ps1 -SystemOnly from this repo on the USB - the drive
-             with sources\boot.wim, so a copy on B: is never picked up).
+             with sources\boot.wim, so a stray copy on another drive is never picked up).
              Kept terse on purpose: Path is limited to 259 characters. -->
         <RunSynchronousCommand wcm:action="add">
           <Order>4</Order>
