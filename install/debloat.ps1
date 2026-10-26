@@ -39,7 +39,8 @@ $appsToRemove = @(
     'MicrosoftCorporationII.QuickAssist'
     'MicrosoftWindows.CrossDevice'
     'Microsoft.549981C3F5F10'              # Cortana leftovers
-    'MSTeams'                              # consumer Teams; company Teams is installed via apps.ps1
+    'MicrosoftTeams'                       # old consumer Teams (personal)
+    # NOT 'MSTeams' - that is the new work Teams installed by apps.ps1
 )
 # Deliberately KEPT: Store, Xbox apps (games/Game Pass), Calculator, Photos,
 # Snipping Tool, Notepad, Terminal, Paint.
